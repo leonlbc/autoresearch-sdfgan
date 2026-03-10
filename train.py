@@ -50,7 +50,7 @@ class Config:
     weight_decay_l2:  float = 0.0
     l1_lambda:        float = 0.0
     batch_norm:       bool  = False
-    max_grad_norm:    float = 0.0    # gradient clipping (0 = disabled)
+    max_grad_norm:    float = 1.0    # gradient clipping
 
     # --- Loss ---
     weighted_loss:        bool  = True
