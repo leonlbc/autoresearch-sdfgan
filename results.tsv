@@ -21,3 +21,8 @@ c6cea43	1.410092	0.559309	0.002638	keep	gradient clipping max_grad_norm=1.0
 5725295	0.334386	0.207874	0.001246	discard	batch normalization (hurt badly)
 d04e836	1.216734	0.657553	0.003731	discard	switch to GRU
 546139f	1.388175	0.621965	0.002856	discard	increase learning rate to 2e-3
+d9850f9	1.278604	0.525735	0.002391	discard	cosine annealing LR schedule
+f49bd0a	1.376633	0.548796	0.002614	discard	tighter gradient clipping (0.5)
+8e2ab5e	1.000179	0.452443	0.002042	discard	layer normalization (hurt)
+355b2f0	0.863898	0.454881	0.001608	discard	Kaiming init for Linear layers (hurt)
+d6480a6	1.350135	0.528842	0.002107	discard	reduce dropout to 0.08
