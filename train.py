@@ -59,7 +59,7 @@ class Config:
     # --- Training schedule ---
     num_epochs_unc:    int   = 128   # Phase 1: unconditional
     num_epochs_moment: int   = 16    # Phase 2: moment update
-    num_epochs_cond:   int   = 384   # Phase 3: conditional (increased from 256)
+    num_epochs_cond:   int   = 512   # Phase 3: conditional (increased from 384)
     sub_epoch:         int   = 4     # gradient steps per epoch
     learning_rate:     float = 1e-3
     optimizer:         str   = 'Adam'
