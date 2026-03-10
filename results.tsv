@@ -27,3 +27,4 @@ f49bd0a	1.376633	0.548796	0.002614	discard	tighter gradient clipping (0.5)
 355b2f0	0.863898	0.454881	0.001608	discard	Kaiming init for Linear layers (hurt)
 d6480a6	1.350135	0.528842	0.002107	discard	reduce dropout to 0.08
 bd54ff2	1.424404	0.601009	0.002183	keep	increase Phase 3 epochs to 384
+136e887	1.458598	0.632790	0.002420	keep	increase Phase 3 epochs to 512
