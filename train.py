@@ -57,9 +57,9 @@ class Config:
     residual_loss_factor: float = 0.0
 
     # --- Training schedule ---
-    num_epochs_unc:    int   = 64    # Phase 1: unconditional
+    num_epochs_unc:    int   = 128   # Phase 1: unconditional
     num_epochs_moment: int   = 16    # Phase 2: moment update
-    num_epochs_cond:   int   = 128   # Phase 3: conditional
+    num_epochs_cond:   int   = 256   # Phase 3: conditional
     sub_epoch:         int   = 4     # gradient steps per epoch
     learning_rate:     float = 1e-3
     optimizer:         str   = 'Adam'
