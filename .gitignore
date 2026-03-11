@@ -2,3 +2,5 @@ datasets/
 __pycache__/
 *.pyc
 .venv/
+results.tsv
+run.log
