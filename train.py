@@ -36,6 +36,7 @@ class Config:
     rnn_hidden:     int   = 4
     rnn_layers:     int   = 1
     hidden_dims:    list  = field(default_factory=lambda: [256, 192])
+    film_groups:    int   = 4             # group-wise FiLM modulation (0=off)
     activation:     str   = 'GELU'        # 'ReLU', 'ELU', 'Tanh', 'LeakyReLU', 'GELU', 'SiLU'
 
     # --- Moment Layer (adversary) architecture ---
@@ -134,9 +135,17 @@ def init_weights_tf_style(module):
 # ---------------------------------------------------------------------------
 
 class ModelLayer(nn.Module):
+    """Generator with group-wise FiLM conditioning.
+
+    Macro features (via LSTM) generate per-group scale/shift that modulate
+    hidden layers: h = (1 + gamma) * Linear(x) + beta, where gamma/beta
+    are shared within groups of hidden units.  This captures macro-dependent
+    pricing without the memory cost of per-channel FiLM.
+    """
     def __init__(self, cfg: Config):
         super().__init__()
         self.use_rnn = cfg.use_rnn
+        self.film_groups = cfg.film_groups
 
         if self.use_rnn:
             RNNCls = {'LSTM': nn.LSTM, 'GRU': nn.GRU, 'RNN': nn.RNN}[cfg.rnn_type]
@@ -153,14 +162,30 @@ class ModelLayer(nn.Module):
         else:
             macro_out_dim = cfg.macro_feature_dim
 
-        self.nn = build_dense_block(
-            in_dim=cfg.individual_feature_dim + macro_out_dim,
-            hidden_dims=cfg.hidden_dims,
-            out_dim=1,
-            activation=cfg.activation,
-            dropout=cfg.dropout,
-            batch_norm=cfg.batch_norm,
-        )
+        ActCls = ACTIVATIONS[cfg.activation]
+        in_dim = cfg.individual_feature_dim
+        self.layers = nn.ModuleList()
+        self.acts = nn.ModuleList()
+        self.dropouts = nn.ModuleList()
+        self.film_layers = nn.ModuleList()
+
+        G = self.film_groups
+        for h_dim in cfg.hidden_dims:
+            self.layers.append(nn.Linear(in_dim, h_dim))
+            self.acts.append(ActCls())
+            self.dropouts.append(nn.Dropout(p=cfg.dropout))
+            if G > 0:
+                assert h_dim % G == 0, f"hidden_dim {h_dim} not divisible by film_groups {G}"
+                self.film_layers.append(nn.Linear(macro_out_dim, G * 2))
+            in_dim = h_dim
+
+        self.output = nn.Linear(in_dim, 1)
+
+    def _init_film_zero(self):
+        """Zero-init FiLM layers so modulation starts as identity."""
+        for film in self.film_layers:
+            nn.init.zeros_(film.weight)
+            nn.init.zeros_(film.bias)
 
     def forward(self, I_macro, I_indiv, mask, h0=None):
         T, N, _ = I_indiv.shape
@@ -173,9 +198,29 @@ class ModelLayer(nn.Module):
             macro = I_macro
             rnn_state = None
 
-        macro_tiled = macro.unsqueeze(1).expand(-1, N, -1)
-        x = torch.cat([I_indiv[mask], macro_tiled[mask]], dim=1)
-        w = self.nn(x).squeeze(-1)
+        G = self.film_groups
+        if G > 0:
+            # FiLM params at time level: each (T, G*2) — tiny
+            film_params_t = [film(macro) for film in self.film_layers]
+            time_idx = torch.arange(T, device=I_indiv.device).unsqueeze(1).expand(T, N)[mask]
+
+        h = I_indiv[mask]
+
+        for i, (linear, act, drop) in enumerate(
+                zip(self.layers, self.acts, self.dropouts)):
+            h = linear(h)
+            if G > 0:
+                h_dim = h.shape[-1]
+                fp = film_params_t[i][time_idx]       # (num_valid, G*2) — small
+                gamma, beta = fp.chunk(2, dim=-1)      # each (num_valid, G)
+                # Reshape → broadcast within groups → reshape back
+                h = h.view(-1, G, h_dim // G)
+                h = h * (1 + gamma.unsqueeze(-1)) + beta.unsqueeze(-1)
+                h = h.view(-1, h_dim)
+            h = act(h)
+            h = drop(h)
+
+        w = self.output(h).squeeze(-1)
         return w, rnn_state
 
 
@@ -241,6 +286,7 @@ class SDFGAN(nn.Module):
         self.model_layer = ModelLayer(cfg)
         self.moment_layer = MomentLayer(cfg)
         init_weights_tf_style(self)
+        self.model_layer._init_film_zero()  # identity modulation at start
 
     def compute_weights_and_sdf(self, I_macro, I_indiv, R, mask, h0=None):
         """Forward pass -> per-stock weights and per-period SDF."""
