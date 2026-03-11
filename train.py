@@ -46,7 +46,7 @@ class Config:
     num_moment_conditions: int  = 8
 
     # --- Regularization ---
-    dropout:          float = 0.10   # drop probability (increased from 0.05 to combat overfitting)
+    dropout:          float = 0.12   # drop probability (tuned up from 0.10)
     weight_decay_l2:  float = 0.0
     l1_lambda:        float = 0.0
     batch_norm:       bool  = False
