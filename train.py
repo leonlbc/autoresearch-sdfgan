@@ -35,7 +35,7 @@ class Config:
     rnn_type:       str   = 'LSTM'        # 'LSTM', 'GRU', 'RNN'
     rnn_hidden:     int   = 4
     rnn_layers:     int   = 1
-    hidden_dims:    list  = field(default_factory=lambda: [256, 128])
+    hidden_dims:    list  = field(default_factory=lambda: [256, 192])
     activation:     str   = 'GELU'        # 'ReLU', 'ELU', 'Tanh', 'LeakyReLU', 'GELU', 'SiLU'
 
     # --- Moment Layer (adversary) architecture ---
