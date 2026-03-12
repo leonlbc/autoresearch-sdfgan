@@ -33,7 +33,7 @@ class Config:
     # --- Model Layer (generator) architecture ---
     use_rnn:        bool  = True
     rnn_type:       str   = 'LSTM'        # 'LSTM', 'GRU', 'RNN'
-    rnn_hidden:     int   = 4
+    rnn_hidden:     int   = 8
     rnn_layers:     int   = 1
     hidden_dims:    list  = field(default_factory=lambda: [256, 192])
     film_groups:    int   = 4             # group-wise FiLM modulation (0=off)
