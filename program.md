@@ -151,7 +151,6 @@ The Stochastic Discount Factor $M_t = 1 + \sum_i R_{t,i} \cdot w_{t,i}$ prices a
 - Changing the evaluation metric or data preprocessing
 
 ### Interpreting results
-- Monthly Sharpe of 0.3-0.5 on validation is typical
 - Train Sharpe >> Valid Sharpe indicates overfitting
 - Test Sharpe is reported but should NOT guide model selection (look-ahead bias)
 - Explained Variation (EV) ~3-5% is typical for a 1-factor model
