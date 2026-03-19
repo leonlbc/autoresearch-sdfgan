@@ -146,7 +146,6 @@ The Stochastic Discount Factor $M_t = 1 + \sum_i R_{t,i} \cdot w_{t,i}$ prices a
 ### Things to AVOID
 - Removing the 3-phase structure entirely
 - Very large models that overfit 240 months of training data
-- Ignoring the mask — missing values (-99.99) must be handled
 - Training for too many epochs without early stopping
 - Changing the evaluation metric or data preprocessing
 
