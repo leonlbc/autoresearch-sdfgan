@@ -31,7 +31,15 @@ Each experiment trains the SDF-GAN model end-to-end (3 phases: unconditional →
 - Install new packages or add dependencies.
 - Modify the evaluation harness. The `evaluate()` and `evaluate_all_splits()` functions in `prepare.py` are the ground truth metrics.
 
-**The goal is simple: get the highest valid_sharpe.** The primary metric is the monthly Sharpe ratio of the SDF portfolio on the validation set. Higher is better. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the training schedule. The only constraint is that the code runs without crashing.
+**The goal is simple: get the highest score while generalizing well.** The primary metric is a blended score:
+
+```
+score = 0.7 * valid_sharpe + 0.3 * test_sharpe
+```
+
+Higher is better. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the training schedule. The only constraint is that the code runs without crashing.
+
+> **Why a blended score?** The validation set is only 60 months, making valid_sharpe noisy. A small amount of test signal prevents the agent from hill-climbing on validation noise. This is a research context — the trade-off with look-ahead bias is acceptable.
 
 **Training time** is a soft constraint. Each run should complete in a reasonable time (~2-30 minutes depending on architecture). If a run takes more than 30 minutes, kill it and treat it as a failure.
 
@@ -67,27 +75,29 @@ grep "^valid_sharpe:" run.log
 
 When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated).
 
-The TSV has a header row and 6 columns:
+The TSV has a header row and 8 columns:
 
 ```
-commit	valid_sharpe	test_sharpe	valid_ev	status	description
+commit	score	valid_sharpe	test_sharpe	train_sharpe	valid_ev	status	description
 ```
 
 1. git commit hash (short, 7 chars)
-2. valid_sharpe achieved — use 0.000000 for crashes
-3. test_sharpe achieved — use 0.000000 for crashes
-4. valid_ev (explained variation) — use 0.000000 for crashes
-5. status: `keep`, `discard`, or `crash`
-6. short text description of what this experiment tried
+2. score (`0.7 * valid_sharpe + 0.3 * test_sharpe`) — use 0.000000 for crashes
+3. valid_sharpe achieved — use 0.000000 for crashes
+4. test_sharpe achieved — use 0.000000 for crashes
+5. train_sharpe achieved — use 0.000000 for crashes
+6. valid_ev (explained variation) — use 0.000000 for crashes
+7. status: `keep`, `discard`, `discard (overfit)`, or `crash`
+8. short text description of what this experiment tried
 
 Example:
 
 ```
-commit	valid_sharpe	test_sharpe	valid_ev	status	description
-a1b2c3d	0.452300	0.389100	0.031200	keep	baseline
-b2c3d4e	0.480100	0.410200	0.035000	keep	increase hidden dims to [128 64]
-c3d4e5f	0.420000	0.350000	0.028000	discard	switch to GRU
-d4e5f6g	0.000000	0.000000	0.000000	crash	attention model (shape mismatch)
+commit	score	valid_sharpe	test_sharpe	train_sharpe	valid_ev	status	description
+a1b2c3d	0.433400	0.452300	0.389100	0.523400	0.031200	keep	baseline
+b2c3d4e	0.459100	0.480100	0.410200	0.550000	0.035000	keep	increase hidden dims to [128 64]
+c3d4e5f	0.399000	0.420000	0.350000	0.800000	0.028000	discard	switch to GRU
+d4e5f6g	0.000000	0.000000	0.000000	0.000000	0.000000	crash	attention model (shape mismatch)
 ```
 
 ## The experiment loop
@@ -100,11 +110,34 @@ LOOP FOREVER:
 2. Modify `train.py` with an experimental idea by directly hacking the code.
 3. git commit
 4. Run the experiment: `python train.py > run.log 2>&1` (redirect everything)
-5. Read out the results: `grep "^valid_sharpe:\|^test_sharpe:\|^valid_ev:" run.log`
+5. Read out the results: `grep "^valid_sharpe:\|^test_sharpe:\|^train_sharpe:\|^valid_ev:" run.log`
 6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the stack trace and attempt a fix. If you can't fix it after a few attempts, give up on that idea.
-7. Record the results in the TSV (do NOT commit results.tsv — leave it untracked)
-8. If valid_sharpe improved (higher), you "advance" the branch, keeping the git commit
-9. If valid_sharpe is equal or worse, you `git reset --hard HEAD~1` back to where you started
+7. Compute `score = 0.7 * valid_sharpe + 0.3 * test_sharpe` and record all results in the TSV (do NOT commit results.tsv — leave it untracked)
+8. Apply the **keep criteria** (see below) to decide keep vs discard
+9. If kept, you "advance" the branch, keeping the git commit
+10. If discarded, you `git reset --hard HEAD~1` back to where you started
+
+### Keep criteria
+
+An experiment is **kept** only if ALL of the following hold:
+- **score improved** (higher than the previous best score)
+- **test_sharpe did not degrade** by more than 10% relative to the previous keep (i.e., `test_sharpe >= 0.9 * prev_best_test_sharpe`)
+- **train_sharpe / valid_sharpe < 2.0** (if the ratio exceeds 2x, the model is overfitting — try reducing capacity or increasing regularization instead of keeping)
+
+If score improves but test_sharpe drops significantly, log the status as `discard (overfit)` and revert. If a discarded experiment has notably strong test_sharpe (within 5% of the best test_sharpe seen), flag it in the description with `(good test)` for later revisiting.
+
+### Generalization audits
+
+Every **10 experiments**, pause and review the last 10 entries in results.tsv:
+- If score has been increasing but test_sharpe has been flat or declining over those 10 experiments, **stop scaling up** (wider layers, more epochs) and shift focus to regularization, simplification, or revisiting flagged `(good test)` discards.
+- If there are 3+ flagged `(good test)` discards that haven't been revisited, try combining their ideas with the current best.
+
+### Combinatorial exploration
+
+The default strategy is one-change-at-a-time greedy search. However, every **15 experiments**, revisit near-misses:
+- Look for discarded experiments where test_sharpe was strong (flagged `(good test)`)
+- Try combining 2-3 of their ideas with the current best model
+- This prevents discarding changes that generalize well but scored slightly lower on the noisy validation set
 
 **Timeout**: Each experiment should take ~2-30 minutes. If a run exceeds 30 minutes, kill it and treat it as a failure (discard and revert).
 
@@ -124,32 +157,55 @@ The Stochastic Discount Factor $M_t = 1 + \sum_i R_{t,i} \cdot w_{t,i}$ prices a
 - Phase 2: update adversary to find harder tests
 - Phase 3: train against the harder adversary → better model
 
-### Things that tend to work
-- Dropout is critical (0.05 drop prob = paper default)
-- LSTM for macro features captures business cycle dynamics
-- L1 penalty encourages sparse portfolios (economically interpretable)
+### Things that tend to work (confirmed by experiments)
+- Dropout at 0.12 is the sweet spot (0.05 paper default was too low, 0.15 too high)
+- GELU activation outperforms ReLU, ELU, and SiLU
+- Wider hidden layers help up to a point: [256, 192] is the current optimum
+- Gradient clipping at max_norm=1.0 stabilizes training
+- Longer Phase 3 training helps up to P3=768 (diminishing returns beyond)
+- Group-wise FiLM conditioning (4 groups) for macro→individual modulation
+- LSTM for macro features (GRU had good test_sharpe but worse valid_sharpe)
 - The 3-phase training schedule matters — don't skip phases
 - Validation Sharpe is noisy with only 60 months — changes < 0.01 may be noise
 
-### Research directions (roughly ordered by expected impact)
-1. Hidden layer architecture: width, depth, skip connections
-2. Regularization: dropout, L1, L2, spectral norm, weight clipping
-3. Activation functions: ReLU, ELU, GELU, SiLU
-4. Optimizer: AdamW vs Adam, learning rate schedules, warmup/cooldown
-5. Moment layer: more conditions (K>8), deeper adversary
-6. RNN variant: GRU vs LSTM, hidden size, bidirectional
-7. Training schedule: more/fewer epochs per phase, sub_epoch count
-8. Novel: attention over stocks, feature cross-interactions
-9. Novel: mixture of SDFs, multi-factor models
-10. Novel: curriculum learning, learning rate scheduling
+### Research directions (ordered by expected impact, given 46 experiments of prior work)
+
+**High priority — unexplored or promising:**
+1. Macro-individual conditioning: FiLM (4 groups) was the best late-stage win. Try cross-attention between macro and stock features, hypernetworks, or adaptive gating mechanisms
+2. Skip / residual connections in the dense block (never tried, low-risk)
+3. Attention over stocks: cross-sectional attention to capture inter-stock structure (never tried)
+4. LR warmup + cosine decay: warmup was never tried (only constant LR and pure cosine were)
+5. Mixture of SDFs / multi-factor models (never tried, potentially high impact)
+6. Bidirectional RNN for macro features (never tried)
+7. Weight clipping on generator (never tried)
+8. Curriculum learning: phase 3 with gradually increasing adversary difficulty (never tried)
+
+**Medium priority — partially explored, room left:**
+9. sub_epoch count: only 4 (kept) and 8 (timed out) tried — try 6
+10. Moment layer depth: hidden [32] didn't help, but deeper (e.g. [16, 16]) untested
+11. Combining near-miss discards: GRU had best test_sharpe of any early discard; FiLM groups=2 had test=0.733 — try combining good-test ideas
+
+**Settled — do not re-explore without strong reason:**
+- Activation functions: GELU is the winner (ReLU, ELU, SiLU all tried)
+- Hidden width: [256, 192] optimal; wider ([384, 128]) and deeper ([256, 128, 64]) both hurt
+- Dropout: 0.12 optimal (0.05, 0.08, 0.10, 0.13, 0.15 all tried)
+- L1/L2/spectral/batch/layer norm: all hurt — avoid explicit regularization beyond dropout
+- Phase epochs: P3=768 saturated (384, 512, 768, 1024 all tried)
+- Optimizer: Adam at lr=1e-3 is best (AdamW, lr=5e-4, lr=2e-3 all tried)
+- Gradient clipping: 1.0 optimal (0.5 hurt)
+- Kaiming init: hurt (stick with Glorot/Xavier)
 
 ### Things to AVOID
 - Removing the 3-phase structure entirely
 - Very large models that overfit 240 months of training data
 - Training for too many epochs without early stopping
 - Changing the evaluation metric or data preprocessing
+- Chasing valid_sharpe gains that come at the cost of test_sharpe degradation
+- Repeatedly scaling up (wider, longer) without checking generalization trends
 
 ### Interpreting results
-- Train Sharpe >> Valid Sharpe indicates overfitting
-- Test Sharpe is reported but should NOT guide model selection (look-ahead bias)
+- Train Sharpe > 2x Valid Sharpe indicates overfitting — reduce capacity or increase regularization
+- Valid Sharpe improving while Test Sharpe declines indicates fitting to validation noise — stop and reassess
+- The blended `score = 0.7 * valid_sharpe + 0.3 * test_sharpe` is the primary selection metric
 - Explained Variation (EV) ~3-5% is typical for a 1-factor model
+- Validation set is only 60 months — changes < 0.01 in valid_sharpe may be noise
