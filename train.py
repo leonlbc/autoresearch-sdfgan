@@ -35,7 +35,7 @@ class Config:
     rnn_type:       str   = 'LSTM'        # 'LSTM', 'GRU', 'RNN'
     rnn_hidden:     int   = 8
     rnn_layers:     int   = 1
-    hidden_dims:    list  = field(default_factory=lambda: [256, 192])
+    hidden_dims:    list  = field(default_factory=lambda: [256, 256])
     film_groups:    int   = 4             # group-wise FiLM modulation (0=off)
     activation:     str   = 'GELU'        # 'ReLU', 'ELU', 'Tanh', 'LeakyReLU', 'GELU', 'SiLU'
 
