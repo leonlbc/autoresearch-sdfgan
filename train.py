@@ -48,7 +48,7 @@ class Config:
 
     # --- Regularization ---
     dropout:          float = 0.12   # drop probability (tuned up from 0.10)
-    input_noise_std:  float = 0.01  # Gaussian noise on individual features during training
+    input_noise_std:  float = 0.02  # Gaussian noise on individual features during training
     weight_decay_l2:  float = 0.0
     l1_lambda:        float = 0.0
     batch_norm:       bool  = False
