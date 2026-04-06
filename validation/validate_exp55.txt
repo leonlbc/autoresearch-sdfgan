@@ -1,0 +1,33 @@
+Validation run: exp55 (current best, commit e68c340)
+Date: 2026-04-06
+Hardware: RTX 3050 Laptop GPU (local)
+Runtime: 6114s (~102 min)
+
+Configuration: train.py at commit e68c340
+  Hidden: [256, 192], GELU, dropout 0.12
+  FiLM conditioning (4 groups), LSTM macro, input noise std=0.02
+  Phase epochs: P1=128, P2=4x16, P3=768
+
+Single-split metrics (from experiment loop):
+  valid_sharpe: 1.633
+  test_sharpe:  0.629
+  train_sharpe: 2.875
+
+Rolling-window results (6 windows, 240-month train, 60-month OOS):
+  oos_sharpe:       0.985
+  avg_train_sharpe: 5.457
+  oos_ev:           0.0045
+  n_windows:        6
+  n_oos_months:     360
+
+  window_0_sharpe:  1.140  (train [0-239],   eval [240-299])
+  window_1_sharpe:  1.723  (train [60-299],  eval [300-359])
+  window_2_sharpe:  1.131  (train [120-359], eval [360-419])
+  window_3_sharpe:  1.063  (train [180-419], eval [420-479])
+  window_4_sharpe:  0.663  (train [240-479], eval [480-539])
+  window_5_sharpe:  0.728  (train [300-539], eval [540-599])
+
+Key observations:
+  - Single-split valid_sharpe (1.63) inflated ~65% vs robust OOS (0.99)
+  - Strong in windows 0-3 (>1.0), weaker in windows 4-5 (<0.75)
+  - Train/OOS ratio ~5.5x indicates significant within-window overfitting

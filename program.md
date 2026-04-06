@@ -31,15 +31,13 @@ Each experiment trains the SDF-GAN model end-to-end (3 phases: unconditional →
 - Install new packages or add dependencies.
 - Modify the evaluation harness. The `evaluate()` and `evaluate_all_splits()` functions in `prepare.py` are the ground truth metrics.
 
-**The goal is simple: get the highest score while generalizing well.** The primary metric is a blended score:
+**The goal is simple: get the highest valid_sharpe while generalizing well.** The primary metric is:
 
 ```
-score = 0.7 * valid_sharpe + 0.3 * test_sharpe
+score = valid_sharpe
 ```
 
-Higher is better. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the training schedule. The only constraint is that the code runs without crashing.
-
-> **Why a blended score?** The validation set is only 60 months, making valid_sharpe noisy. A small amount of test signal prevents the agent from hill-climbing on validation noise. This is a research context — the trade-off with look-ahead bias is acceptable.
+Higher is better. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the training schedule. The only constraint is that the code runs without crashing. The test set is never used for model selection — test_sharpe is recorded for reporting only.
 
 **Training time** is a soft constraint. Each run should complete in a reasonable time (~2-30 minutes depending on architecture). If a run takes more than 30 minutes, kill it and treat it as a failure.
 
@@ -75,29 +73,28 @@ grep "^valid_sharpe:" run.log
 
 When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated).
 
-The TSV has a header row and 8 columns:
+The TSV has a header row and 7 columns:
 
 ```
-commit	score	valid_sharpe	test_sharpe	train_sharpe	valid_ev	status	description
+commit	valid_sharpe	test_sharpe	train_sharpe	valid_ev	status	description
 ```
 
 1. git commit hash (short, 7 chars)
-2. score (`0.7 * valid_sharpe + 0.3 * test_sharpe`) — use 0.000000 for crashes
-3. valid_sharpe achieved — use 0.000000 for crashes
-4. test_sharpe achieved — use 0.000000 for crashes
-5. train_sharpe achieved — use 0.000000 for crashes
-6. valid_ev (explained variation) — use 0.000000 for crashes
-7. status: `keep`, `discard`, `discard (overfit)`, or `crash`
-8. short text description of what this experiment tried
+2. valid_sharpe achieved — use 0.000000 for crashes
+3. test_sharpe achieved (reporting only, not used for selection) — use 0.000000 for crashes
+4. train_sharpe achieved — use 0.000000 for crashes
+5. valid_ev (explained variation) — use 0.000000 for crashes
+6. status: `keep`, `discard`, `discard (overfit)`, or `crash`
+7. short text description of what this experiment tried
 
 Example:
 
 ```
-commit	score	valid_sharpe	test_sharpe	train_sharpe	valid_ev	status	description
-a1b2c3d	0.433400	0.452300	0.389100	0.523400	0.031200	keep	baseline
-b2c3d4e	0.459100	0.480100	0.410200	0.550000	0.035000	keep	increase hidden dims to [128 64]
-c3d4e5f	0.399000	0.420000	0.350000	0.800000	0.028000	discard	switch to GRU
-d4e5f6g	0.000000	0.000000	0.000000	0.000000	0.000000	crash	attention model (shape mismatch)
+commit	valid_sharpe	test_sharpe	train_sharpe	valid_ev	status	description
+a1b2c3d	0.452300	0.389100	0.523400	0.031200	keep	baseline
+b2c3d4e	0.480100	0.410200	0.550000	0.035000	keep	increase hidden dims to [128 64]
+c3d4e5f	0.420000	0.350000	0.800000	0.028000	discard	switch to GRU
+d4e5f6g	0.000000	0.000000	0.000000	0.000000	crash	attention model (shape mismatch)
 ```
 
 ## The experiment loop
@@ -112,7 +109,7 @@ LOOP FOREVER:
 4. Run the experiment: `python train.py > run.log 2>&1` (redirect everything)
 5. Read out the results: `grep "^valid_sharpe:\|^test_sharpe:\|^train_sharpe:\|^valid_ev:" run.log`
 6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the stack trace and attempt a fix. If you can't fix it after a few attempts, give up on that idea.
-7. Compute `score = 0.7 * valid_sharpe + 0.3 * test_sharpe` and record all results in the TSV (do NOT commit results.tsv — leave it untracked)
+7. Record `score = valid_sharpe` and all results in the TSV (do NOT commit results.tsv — leave it untracked)
 8. Apply the **keep criteria** (see below) to decide keep vs discard
 9. If kept, you "advance" the branch, keeping the git commit
 10. If discarded, you `git reset --hard HEAD~1` back to where you started
@@ -120,24 +117,32 @@ LOOP FOREVER:
 ### Keep criteria
 
 An experiment is **kept** only if ALL of the following hold:
-- **score improved** (higher than the previous best score)
-- **test_sharpe did not degrade** by more than 10% relative to the previous keep (i.e., `test_sharpe >= 0.9 * prev_best_test_sharpe`)
+- **score improved** (higher than the previous best `valid_sharpe`)
 - **train_sharpe / valid_sharpe < 2.0** (if the ratio exceeds 2x, the model is overfitting — try reducing capacity or increasing regularization instead of keeping)
-
-If score improves but test_sharpe drops significantly, log the status as `discard (overfit)` and revert. If a discarded experiment has notably strong test_sharpe (within 5% of the best test_sharpe seen), flag it in the description with `(good test)` for later revisiting.
 
 ### Generalization audits
 
 Every **10 experiments**, pause and review the last 10 entries in results.tsv:
-- If score has been increasing but test_sharpe has been flat or declining over those 10 experiments, **stop scaling up** (wider layers, more epochs) and shift focus to regularization, simplification, or revisiting flagged `(good test)` discards.
-- If there are 3+ flagged `(good test)` discards that haven't been revisited, try combining their ideas with the current best.
+- If valid_sharpe has been increasing but the train/valid Sharpe ratio has been growing, **stop scaling up** (wider layers, more epochs) and shift focus to regularization or simplification.
+- Look for discarded experiments with interesting approaches that might combine well with the current best.
 
 ### Combinatorial exploration
 
 The default strategy is one-change-at-a-time greedy search. However, every **15 experiments**, revisit near-misses:
-- Look for discarded experiments where test_sharpe was strong (flagged `(good test)`)
+- Look for discarded experiments that were close to the best score or had interesting properties
 - Try combining 2-3 of their ideas with the current best model
-- This prevents discarding changes that generalize well but scored slightly lower on the noisy validation set
+- This prevents discarding changes that might synergize but scored slightly lower individually
+
+### Rolling-window validation (`validate.py`)
+
+`validate.py` re-trains the current best model on 6 rolling 240-month windows and evaluates each on the next 60 months out-of-sample. It produces a robust, multi-window OOS Sharpe that is far less noisy than the single 60-month validation split used in the main loop. **It is expensive** (~6× a normal run), so do not run it routinely — only when one of the following conditions is met:
+
+1. **Big valid_sharpe jump**: The current best `valid_sharpe` has improved by ≥ 0.05 since the last validation run (or since baseline, if never validated). A single 60-month window is noisy; confirm the gain is real before building further on it.
+2. **Generalization audit concern**: A generalization audit (every 10 experiments) reveals a rising train/valid Sharpe ratio or stalling valid_sharpe despite train improvements. Use the rolling window to check whether the current best is genuinely robust or is starting to overfit.
+3. **Pre-commitment check**: You are about to make a major architectural change (new layer type, new conditioning mechanism, fundamentally different structure). Validate the current foundation first so you have a reliable baseline to compare against after the change.
+4. **Long discard streak**: 5+ consecutive experiments have been discarded without improving. Validate the current best — if the rolling-window Sharpe is weak, consider reverting further back rather than continuing to micro-optimize a fragile checkpoint.
+
+**How to run:** `python validate.py > validate_run.log 2>&1`, then inspect the output. The script prints per-window OOS Sharpe and an aggregate summary. Do NOT log validation results in `results.tsv` — that file is only for the main experiment loop. Instead, note the rolling-window Sharpe in your commit message or print it for the human.
 
 **Timeout**: Each experiment should take ~2-30 minutes. If a run exceeds 30 minutes, kill it and treat it as a failure (discard and revert).
 
@@ -200,12 +205,10 @@ The Stochastic Discount Factor $M_t = 1 + \sum_i R_{t,i} \cdot w_{t,i}$ prices a
 - Very large models that overfit 240 months of training data
 - Training for too many epochs without early stopping
 - Changing the evaluation metric or data preprocessing
-- Chasing valid_sharpe gains that come at the cost of test_sharpe degradation
-- Repeatedly scaling up (wider, longer) without checking generalization trends
+- Repeatedly scaling up (wider, longer) without checking the train/valid Sharpe ratio
 
 ### Interpreting results
 - Train Sharpe > 2x Valid Sharpe indicates overfitting — reduce capacity or increase regularization
-- Valid Sharpe improving while Test Sharpe declines indicates fitting to validation noise — stop and reassess
-- The blended `score = 0.7 * valid_sharpe + 0.3 * test_sharpe` is the primary selection metric
+- `score = valid_sharpe` is the primary selection metric — test_sharpe is recorded for reporting only
 - Explained Variation (EV) ~3-5% is typical for a 1-factor model
 - Validation set is only 60 months — changes < 0.01 in valid_sharpe may be noise

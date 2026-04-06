@@ -284,6 +284,212 @@ def print_results(results):
 
 
 # ---------------------------------------------------------------------------
+# Rolling-window evaluation
+# ---------------------------------------------------------------------------
+
+
+class RollingWindowDataset:
+    """Loads all 3 splits once into CPU numpy, assembles rolling windows on demand."""
+
+    def __init__(self):
+        _check_data_exists()
+        tmp = np.load(CHAR_TRAIN)
+        self._char_train = tmp['data']
+        tmp = np.load(CHAR_VALID)
+        self._char_valid = tmp['data']
+        tmp = np.load(CHAR_TEST)
+        self._char_test = tmp['data']
+
+        self._macro_train = np.load(MACRO_TRAIN)['data']
+        self._macro_valid = np.load(MACRO_VALID)['data']
+        self._macro_test = np.load(MACRO_TEST)['data']
+
+        # (char_array, macro_array, global_start, global_end)
+        self._splits = [
+            (self._char_train, self._macro_train, 0, N_TRAIN),
+            (self._char_valid, self._macro_valid, N_TRAIN, N_TRAIN + N_VALID),
+            (self._char_test, self._macro_test,
+             N_TRAIN + N_VALID, N_TRAIN + N_VALID + N_TEST),
+        ]
+
+        print("RollingWindowDataset loaded:")
+        print(f"  Train: {self._char_train.shape}, Macro: {self._macro_train.shape}")
+        print(f"  Valid: {self._char_valid.shape}, Macro: {self._macro_valid.shape}")
+        print(f"  Test:  {self._char_test.shape}, Macro: {self._macro_test.shape}")
+
+    def _assemble_portion(self, global_start, global_end):
+        """Extract months [global_start, global_end), pad N to max, filter invalid stocks.
+
+        Returns:
+            char_data: (T, N_valid, 47) — only stocks with >=1 valid month
+            macro_data: (T, 178)
+        """
+        char_parts = []
+        macro_parts = []
+        ns = []
+
+        for char, macro, sp_start, sp_end in self._splits:
+            lo = max(global_start, sp_start)
+            hi = min(global_end, sp_end)
+            if lo >= hi:
+                continue
+            local_lo = lo - sp_start
+            local_hi = hi - sp_start
+            char_parts.append(char[local_lo:local_hi])
+            macro_parts.append(macro[local_lo:local_hi])
+            ns.append(char.shape[1])
+
+        N_max = max(ns)
+
+        padded = []
+        for cp, n in zip(char_parts, ns):
+            if n < N_max:
+                T_s = cp.shape[0]
+                pad = np.full((T_s, N_max - n, 47), UNK, dtype=cp.dtype)
+                padded.append(np.concatenate([cp, pad], axis=1))
+            else:
+                padded.append(cp)
+
+        char_data = np.concatenate(padded, axis=0)
+        macro_data = np.concatenate(macro_parts, axis=0)
+
+        # Filter out stocks with zero valid months (avoids T_i=0 in moment_loss)
+        R = char_data[:, :, 0]
+        valid = (R != UNK).any(axis=0)
+        char_data = char_data[:, valid]
+
+        return char_data, macro_data
+
+    def get_window(self, global_start, train_size=240, eval_size=60, device=None):
+        """Assemble a train+eval window and return tensors.
+
+        Returns dict with:
+            train_tensors: (I_macro, I_indiv, R, mask)
+            eval_tensors: (I_macro, I_indiv, R, mask)
+            lw_train: loss weights for training
+            lw_eval: loss weights for eval
+        """
+        if device is None:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        train_end = global_start + train_size
+        eval_end = train_end + eval_size
+
+        char_tr, macro_tr_raw = self._assemble_portion(global_start, train_end)
+        char_ev, macro_ev_raw = self._assemble_portion(train_end, eval_end)
+
+        # Normalize macro using training-portion stats only (no lookahead)
+        mean_m = macro_tr_raw.mean(axis=0)
+        std_m = macro_tr_raw.std(axis=0)
+        std_m[std_m == 0] = 1.0
+        macro_tr = (macro_tr_raw - mean_m) / std_m
+        macro_ev = (macro_ev_raw - mean_m) / std_m
+
+        def _to_tensors(char, macro, dev):
+            R = char[:, :, 0]
+            I = char[:, :, 1:]
+            mask = (R != UNK)
+            return (
+                torch.tensor(macro, dtype=torch.float32, device=dev),
+                torch.tensor(I, dtype=torch.float32, device=dev),
+                torch.tensor(R, dtype=torch.float32, device=dev),
+                torch.tensor(mask, dtype=torch.bool, device=dev),
+            )
+
+        def _loss_weight(char, dev):
+            R = char[:, :, 0]
+            mask = (R != UNK)
+            w = mask.sum(axis=0).astype(np.float32)
+            return torch.tensor(w, device=dev)
+
+        return {
+            'train_tensors': _to_tensors(char_tr, macro_tr, device),
+            'eval_tensors': _to_tensors(char_ev, macro_ev, device),
+            'lw_train': _loss_weight(char_tr, device),
+            'lw_eval': _loss_weight(char_ev, device),
+        }
+
+    def generate_windows(self, train_size=240, eval_size=60, step=60, device=None):
+        """Yield (window_idx, window_data_dict) for all rolling windows."""
+        first_eval_start = N_TRAIN
+        last_month = N_TRAIN + N_VALID + N_TEST
+
+        window_idx = 0
+        eval_start = first_eval_start
+        while eval_start + eval_size <= last_month:
+            train_start = eval_start - train_size
+            window_data = self.get_window(train_start, train_size, eval_size, device)
+            yield window_idx, window_data
+            eval_start += step
+            window_idx += 1
+
+
+@torch.no_grad()
+def evaluate_oos(model, train_tensors, eval_tensors, lw_eval):
+    """Run model through training data for RNN state, then evaluate on eval data.
+
+    Returns dict with portfolio_returns (numpy), sharpe, ev, loss.
+    """
+    model.eval()
+
+    # Forward through training data to obtain RNN hidden state
+    I_macro_tr, I_indiv_tr, R_tr, mask_tr = train_tensors
+    _, _, rnn_state = model.compute_weights_and_sdf(
+        I_macro_tr, I_indiv_tr, R_tr, mask_tr)
+
+    # Evaluate on eval data using the chained RNN state
+    I_macro_ev, I_indiv_ev, R_ev, mask_ev = eval_tensors
+    T, N = R_ev.shape
+    w_flat, sdf, _ = model.compute_weights_and_sdf(
+        I_macro_ev, I_indiv_ev, R_ev, mask_ev, h0=rnn_state)
+
+    h_ones = torch.ones(1, T, N, device=R_ev.device)
+    loss = moment_loss(R_ev, mask_ev, sdf, h_ones, lw_eval).item()
+    res = residual_loss(R_ev, mask_ev, w_flat).item()
+    ev = 1.0 - res
+
+    portfolio_returns = (1.0 - sdf[:, 0]).cpu().numpy()
+    sr = sharpe(portfolio_returns)
+
+    model.train()
+    return {
+        'portfolio_returns': portfolio_returns,
+        'sharpe': float(sr),
+        'ev': ev,
+        'loss': loss,
+    }
+
+
+def aggregate_rolling_results(window_results):
+    """Concatenate OOS returns across windows, compute overall Sharpe.
+
+    Returns dict with oos_sharpe, oos_ev, per_window_sharpes, n_oos_months.
+    """
+    all_returns = np.concatenate([wr['portfolio_returns'] for wr in window_results])
+    return {
+        'oos_sharpe': sharpe(all_returns),
+        'oos_ev': float(np.mean([wr['ev'] for wr in window_results])),
+        'per_window_sharpes': [wr['sharpe'] for wr in window_results],
+        'n_oos_months': len(all_returns),
+    }
+
+
+def print_rolling_results(results, train_sharpes):
+    """Print rolling-window results in grep-friendly format."""
+    peak_mem = (torch.cuda.max_memory_allocated() / 1024 / 1024
+                if torch.cuda.is_available() else 0)
+    print("---")
+    print(f"oos_sharpe:       {results['oos_sharpe']:.6f}")
+    print(f"avg_train_sharpe: {np.mean(train_sharpes):.6f}")
+    print(f"oos_ev:           {results['oos_ev']:.6f}")
+    print(f"n_windows:        {len(results['per_window_sharpes'])}")
+    print(f"n_oos_months:     {results['n_oos_months']}")
+    for i, ws in enumerate(results['per_window_sharpes']):
+        print(f"window_{i}_sharpe:  {ws:.6f}")
+    print(f"peak_vram_mb:     {peak_mem:.1f}")
+
+
+# ---------------------------------------------------------------------------
 # Main: verify data is loadable
 # ---------------------------------------------------------------------------
 
