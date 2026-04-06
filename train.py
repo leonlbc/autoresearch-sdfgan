@@ -33,9 +33,9 @@ class Config:
     # --- Model Layer (generator) architecture ---
     use_rnn:        bool  = True
     rnn_type:       str   = 'LSTM'        # 'LSTM', 'GRU', 'RNN'
-    rnn_hidden:     int   = 8
+    rnn_hidden:     int   = 4
     rnn_layers:     int   = 1
-    hidden_dims:    list  = field(default_factory=lambda: [256, 256])
+    hidden_dims:    list  = field(default_factory=lambda: [256, 192])
     film_groups:    int   = 4             # group-wise FiLM modulation (0=off)
     activation:     str   = 'GELU'        # 'ReLU', 'ELU', 'Tanh', 'LeakyReLU', 'GELU', 'SiLU'
 
@@ -48,6 +48,7 @@ class Config:
 
     # --- Regularization ---
     dropout:          float = 0.12   # drop probability (tuned up from 0.10)
+    input_noise_std:  float = 0.01  # Gaussian noise on individual features during training
     weight_decay_l2:  float = 0.0
     l1_lambda:        float = 0.0
     batch_norm:       bool  = False
@@ -146,6 +147,7 @@ class ModelLayer(nn.Module):
         super().__init__()
         self.use_rnn = cfg.use_rnn
         self.film_groups = cfg.film_groups
+        self.input_noise_std = cfg.input_noise_std
 
         if self.use_rnn:
             RNNCls = {'LSTM': nn.LSTM, 'GRU': nn.GRU, 'RNN': nn.RNN}[cfg.rnn_type]
@@ -205,6 +207,8 @@ class ModelLayer(nn.Module):
             time_idx = torch.arange(T, device=I_indiv.device).unsqueeze(1).expand(T, N)[mask]
 
         h = I_indiv[mask]
+        if self.training and self.input_noise_std > 0:
+            h = h + torch.randn_like(h) * self.input_noise_std
 
         for i, (linear, act, drop) in enumerate(
                 zip(self.layers, self.acts, self.dropouts)):
