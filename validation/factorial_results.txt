@@ -1,0 +1,15 @@
+Factorial decomposition: Architecture x Training Schedule
+=========================================================
+
+Paper arch = [64,64] ReLU, dropout 0.05, no grad clipping
+Agent arch = [256,192] GELU, dropout 0.12, grad clipping 1.0
+
+Paper schedule = P1=256, P2=64, P3=1024 (5,120 generator steps)
+Agent schedule = P1=128, P2=16, P3=768  (3,584 generator steps)
+
+Results (single-split):
+
+paper_arch_paper_sched:  valid_sharpe=1.010916  test_sharpe=0.473269  train_sharpe=2.299069
+paper_arch_agent_sched:  valid_sharpe=0.888696  test_sharpe=0.489978  train_sharpe=2.538554
+agent_arch_paper_sched:  valid_sharpe=1.596130  test_sharpe=0.724510  train_sharpe=1.969812
+agent_arch_agent_sched:  valid_sharpe=1.502274  test_sharpe=0.736158  train_sharpe=exp42

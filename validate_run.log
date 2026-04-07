@@ -1,0 +1,194 @@
+Device: cuda
+RollingWindowDataset loaded:
+  Train: (240, 3686, 47), Macro: (240, 178)
+  Valid: (60, 3347, 47), Macro: (60, 178)
+  Test:  (300, 7141, 47), Macro: (300, 178)
+
+============================================================
+Window 0: train [0-239], eval [240-299]
+  Train: T=240, N=3686  |  Eval: T=60, N=3347
+============================================================
+  === Phase 1: Unconditional (128 epochs) ===
+    [UNC]   32/128  loss 0.0000  SR 1.083  [19s]
+    [UNC]   48/128  loss 0.0000  SR 1.157  [29s]
+    [UNC]   64/128  loss 0.0000  SR 1.222  [39s]
+    [UNC]   80/128  loss 0.0000  SR 1.278  [48s]
+    [UNC]   96/128  loss 0.0000  SR 1.316  [58s]
+    [UNC]  112/128  loss 0.0000  SR 1.344  [68s]
+  Phase 1 done in 77s.
+  === Phase 2: Moment update (64 steps) ===
+  Phase 2 done.
+  === Phase 3: Conditional (768 epochs) ===
+    [COND]   32/768  loss 0.0000  SR 1.381  [20s]
+    [COND]   48/768  loss 0.0000  SR 1.463  [31s]
+    [COND]   64/768  loss 0.0000  SR 1.507  [42s]
+    [COND]   80/768  loss 0.0000  SR 1.603  [52s]
+    [COND]   96/768  loss 0.0000  SR 1.650  [63s]
+    [COND]  112/768  loss 0.0000  SR 1.711  [74s]
+    [COND]  128/768  loss 0.0000  SR 1.747  [85s]
+    [COND]  144/768  loss 0.0000  SR 1.796  [96s]
+    [COND]  160/768  loss 0.0000  SR 1.831  [107s]
+    [COND]  176/768  loss 0.0000  SR 1.884  [118s]
+    [COND]  192/768  loss 0.0000  SR 1.832  [129s]
+    [COND]  208/768  loss 0.0000  SR 1.881  [140s]
+    [COND]  224/768  loss 0.0000  SR 1.957  [150s]
+    [COND]  240/768  loss 0.0000  SR 1.964  [162s]
+    [COND]  256/768  loss 0.0000  SR 2.029  [173s]
+    [COND]  272/768  loss 0.0000  SR 1.964  [184s]
+    [COND]  288/768  loss 0.0000  SR 2.106  [195s]
+    [COND]  304/768  loss 0.0000  SR 2.129  [206s]
+    [COND]  320/768  loss 0.0000  SR 2.182  [217s]
+    [COND]  336/768  loss 0.0000  SR 2.197  [228s]
+    [COND]  352/768  loss 0.0000  SR 2.255  [239s]
+    [COND]  368/768  loss 0.0000  SR 2.294  [250s]
+    [COND]  384/768  loss 0.0000  SR 2.315  [261s]
+    [COND]  400/768  loss 0.0000  SR 2.356  [272s]
+    [COND]  416/768  loss 0.0000  SR 2.385  [283s]
+    [COND]  432/768  loss 0.0000  SR 2.317  [294s]
+    [COND]  448/768  loss 0.0000  SR 2.248  [305s]
+    [COND]  464/768  loss 0.0000  SR 2.439  [316s]
+    [COND]  480/768  loss 0.0000  SR 2.464  [327s]
+    [COND]  496/768  loss 0.0000  SR 2.515  [339s]
+    [COND]  512/768  loss 0.0000  SR 2.550  [350s]
+    [COND]  528/768  loss 0.0000  SR 2.582  [361s]
+    [COND]  544/768  loss 0.0000  SR 2.553  [372s]
+    [COND]  560/768  loss 0.0000  SR 2.628  [383s]
+    [COND]  576/768  loss 0.0000  SR 2.651  [394s]
+    [COND]  592/768  loss 0.0000  SR 2.708  [405s]
+    [COND]  608/768  loss 0.0000  SR 2.678  [416s]
+    [COND]  624/768  loss 0.0000  SR 2.755  [427s]
+    [COND]  640/768  loss 0.0000  SR 2.741  [438s]
+    [COND]  656/768  loss 0.0000  SR 2.804  [449s]
+    [COND]  672/768  loss 0.0000  SR 2.826  [460s]
+    [COND]  688/768  loss 0.0000  SR 2.847  [472s]
+    [COND]  704/768  loss 0.0000  SR 2.855  [483s]
+    [COND]  720/768  loss 0.0000  SR 2.833  [494s]
+    [COND]  736/768  loss 0.0000  SR 2.929  [505s]
+    [COND]  752/768  loss 0.0000  SR 2.946  [516s]
+  Phase 3 done in 527s. Best train Sharpe: 3.0101
+  OOS Sharpe: 1.1403, OOS EV: 0.0038
+
+============================================================
+Window 1: train [60-299], eval [300-359]
+  Train: T=240, N=3686  |  Eval: T=60, N=3500
+============================================================
+  === Phase 1: Unconditional (32 epochs) ===
+  Phase 1 done in 30s.
+  === Phase 2: Moment update (64 steps) ===
+  Phase 2 done.
+  === Phase 3: Conditional (192 epochs) ===
+    [COND]   32/192  loss 0.0000  SR 2.818  [32s]
+    [COND]   48/192  loss 0.0000  SR 2.852  [49s]
+    [COND]   64/192  loss 0.0000  SR 2.976  [65s]
+    [COND]   80/192  loss 0.0000  SR 3.082  [82s]
+    [COND]   96/192  loss 0.0000  SR 3.187  [98s]
+    [COND]  112/192  loss 0.0000  SR 3.220  [115s]
+    [COND]  128/192  loss 0.0000  SR 3.281  [131s]
+    [COND]  144/192  loss 0.0000  SR 3.433  [148s]
+    [COND]  160/192  loss 0.0000  SR 3.388  [164s]
+    [COND]  176/192  loss 0.0000  SR 3.546  [181s]
+  Phase 3 done in 196s. Best train Sharpe: 3.5960
+  OOS Sharpe: 1.7229, OOS EV: 0.0053
+
+============================================================
+Window 2: train [120-359], eval [360-419]
+  Train: T=240, N=3968  |  Eval: T=60, N=4245
+============================================================
+  === Phase 1: Unconditional (32 epochs) ===
+  Phase 1 done in 72s.
+  === Phase 2: Moment update (64 steps) ===
+  Phase 2 done.
+  === Phase 3: Conditional (192 epochs) ===
+    [COND]   32/192  loss 0.0000  SR 3.193  [106s]
+    [COND]   48/192  loss 0.0000  SR 3.324  [159s]
+    [COND]   64/192  loss 0.0000  SR 3.410  [212s]
+    [COND]   80/192  loss 0.0000  SR 3.520  [266s]
+    [COND]   96/192  loss 0.0000  SR 3.679  [319s]
+    [COND]  112/192  loss 0.0000  SR 3.659  [372s]
+    [COND]  128/192  loss 0.0000  SR 3.834  [425s]
+    [COND]  144/192  loss 0.0000  SR 3.695  [479s]
+    [COND]  160/192  loss 0.0000  SR 3.886  [531s]
+    [COND]  176/192  loss 0.0000  SR 4.130  [585s]
+  Phase 3 done in 634s. Best train Sharpe: 4.2797
+  OOS Sharpe: 1.1312, OOS EV: 0.0058
+
+============================================================
+Window 3: train [180-419], eval [420-479]
+  Train: T=240, N=5243  |  Eval: T=60, N=3844
+============================================================
+  === Phase 1: Unconditional (32 epochs) ===
+  Phase 1 done in 145s.
+  === Phase 2: Moment update (64 steps) ===
+  Phase 2 done.
+  === Phase 3: Conditional (192 epochs) ===
+    [COND]   32/192  loss 0.0000  SR 3.628  [207s]
+    [COND]   48/192  loss 0.0000  SR 4.003  [310s]
+    [COND]   64/192  loss 0.0000  SR 4.230  [414s]
+    [COND]   80/192  loss 0.0000  SR 4.273  [517s]
+    [COND]   96/192  loss 0.0000  SR 4.460  [620s]
+    [COND]  112/192  loss 0.0000  SR 4.713  [723s]
+    [COND]  128/192  loss 0.0000  SR 4.920  [826s]
+    [COND]  144/192  loss 0.0000  SR 4.923  [929s]
+    [COND]  160/192  loss 0.0000  SR 5.166  [1033s]
+    [COND]  176/192  loss 0.0000  SR 5.466  [1136s]
+  Phase 3 done in 1232s. Best train Sharpe: 5.6270
+  OOS Sharpe: 1.0631, OOS EV: 0.0055
+
+============================================================
+Window 4: train [240-479], eval [480-539]
+  Train: T=240, N=6313  |  Eval: T=60, N=3290
+============================================================
+  === Phase 1: Unconditional (32 epochs) ===
+  Phase 1 done in 160s.
+  === Phase 2: Moment update (64 steps) ===
+  Phase 2 done.
+  === Phase 3: Conditional (192 epochs) ===
+    [COND]   32/192  loss 0.0000  SR 4.449  [185s]
+    [COND]   48/192  loss 0.0000  SR 5.065  [277s]
+    [COND]   64/192  loss 0.0000  SR 5.851  [370s]
+    [COND]   80/192  loss 0.0000  SR 6.163  [471s]
+    [COND]   96/192  loss 0.0000  SR 6.450  [584s]
+    [COND]  112/192  loss 0.0000  SR 6.706  [698s]
+    [COND]  128/192  loss 0.0000  SR 7.330  [807s]
+    [COND]  144/192  loss 0.0000  SR 7.920  [916s]
+    [COND]  160/192  loss 0.0000  SR 7.107  [1025s]
+    [COND]  176/192  loss 0.0000  SR 8.184  [1135s]
+  Phase 3 done in 1237s. Best train Sharpe: 8.9293
+  OOS Sharpe: 0.6633, OOS EV: 0.0034
+
+============================================================
+Window 5: train [300-539], eval [540-599]
+  Train: T=240, N=6737  |  Eval: T=60, N=2721
+============================================================
+  === Phase 1: Unconditional (32 epochs) ===
+  Phase 1 done in 175s.
+  === Phase 2: Moment update (64 steps) ===
+  Phase 2 done.
+  === Phase 3: Conditional (192 epochs) ===
+    [COND]   32/192  loss 0.0000  SR 3.608  [239s]
+    [COND]   48/192  loss 0.0000  SR 4.101  [361s]
+    [COND]   64/192  loss 0.0000  SR 4.519  [482s]
+    [COND]   80/192  loss 0.0000  SR 4.976  [603s]
+    [COND]   96/192  loss 0.0000  SR 5.245  [724s]
+    [COND]  112/192  loss 0.0000  SR 5.384  [845s]
+    [COND]  128/192  loss 0.0000  SR 5.914  [967s]
+    [COND]  144/192  loss 0.0000  SR 6.232  [1088s]
+    [COND]  160/192  loss 0.0000  SR 6.491  [1210s]
+    [COND]  176/192  loss 0.0000  SR 6.619  [1329s]
+  Phase 3 done in 1442s. Best train Sharpe: 7.2977
+  OOS Sharpe: 0.7283, OOS EV: 0.0032
+---
+oos_sharpe:       0.985007
+avg_train_sharpe: 5.456634
+oos_ev:           0.004499
+n_windows:        6
+n_oos_months:     360
+window_0_sharpe:  1.140293
+window_1_sharpe:  1.722946
+window_2_sharpe:  1.131210
+window_3_sharpe:  1.063068
+window_4_sharpe:  0.663256
+window_5_sharpe:  0.728325
+peak_vram_mb:     4474.3
+
+train_time_s:     6113.7
