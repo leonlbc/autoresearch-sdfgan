@@ -1,0 +1,14 @@
+oos_sharpe:       0.770881
+avg_train_sharpe: 7.197375
+oos_ev:           0.002407
+n_windows:        6
+n_oos_months:     360
+window_0_sharpe:  0.606541
+window_1_sharpe:  1.335296
+window_2_sharpe:  1.160573
+window_3_sharpe:  1.089897
+window_4_sharpe:  0.281815
+window_5_sharpe:  0.597580
+peak_vram_mb:     1683.8
+train_time_s:     535.5
+seed:             7

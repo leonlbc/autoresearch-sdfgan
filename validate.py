@@ -167,9 +167,15 @@ def train_window(cfg, train_tensors, lw_train, device,
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    torch.manual_seed(42)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=42)
+    args = parser.parse_args()
+
+    torch.manual_seed(args.seed)
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(42)
+        torch.cuda.manual_seed(args.seed)
+    print(f"seed:             {args.seed}")
 
     t_start = time.time()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
